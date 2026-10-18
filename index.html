@@ -132,8 +132,8 @@ select:disabled{opacity:.55}
     <section class="matcol" aria-label="Shield drawing">
       <div class="mat" id="matBox"><svg id="mat" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shield outline on a one inch grid"></svg></div>
       <div class="legend" id="legend" hidden>
-        <span><svg viewBox="0 0 26 8"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--accent)" stroke-width="2.5"/></svg>Core outline (cut line)</span>
-        <span><svg viewBox="0 0 26 8"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--c-medium)" stroke-width="2.5" stroke-dasharray="5 3"/></svg>Finished edge with padding</span>
+        <span><svg viewBox="0 0 26 8"><rect width="26" height="8" rx="2" fill="var(--mat)"/><line x1="3" y1="4" x2="23" y2="4" stroke="#ffffff" stroke-width="2"/></svg>Core outline (cut line)</span>
+        <span><svg viewBox="0 0 26 8"><rect width="26" height="8" rx="2" fill="var(--mat)"/><line x1="3" y1="4" x2="23" y2="4" stroke="var(--tape)" stroke-width="2" stroke-dasharray="4 2.5"/></svg>Finished edge with padding</span>
       </div>
       <div class="readout">
         <span class="area" id="area">0 in²</span>
@@ -156,6 +156,8 @@ select:disabled{opacity:.55}
               <option value="kite">Kite</option>
               <option value="teardrop">Teardrop</option>
               <option value="round">Round</option>
+              <option value="oval">Oval</option>
+              <option value="coffin">Coffin</option>
               <option value="rect">Rectangle</option>
             </select></div>
           <div class="field"><label class="lab" for="target">Target size</label>
@@ -257,6 +259,14 @@ var SHAPES = {
     }},
   round:{solve:"d", dims:[{k:"d",label:"Diameter",min:6,max:48,step:0.25,def:23,solvable:true}],
     outline:function(d){var r=d.d/2; return arc(0,r,r,-Math.PI/2,1.5*Math.PI,N*2).slice(0,-1);}},
+  oval:{solve:"h", dims:[W(18),H(30.5)],
+    outline:function(d){var a=d.w/2,b=d.h/2; return arc(0,0,1,-Math.PI/2,1.5*Math.PI,N*2).slice(0,-1).map(function(p){return [a*p[0],b+b*p[1]];});}},
+  coffin:{solve:"h", dims:[W(20),H(25),
+    {k:"sh",label:"Shoulder position",unit:"%",min:5,max:95,step:1,def:30,hint:"How far down the widest point sits, as a share of the height."},
+    {k:"tw",label:"Top edge width",unit:"%",min:0,max:100,step:1,def:60,hint:"Width of the flat top, as a share of the full width."},
+    {k:"bw",label:"Bottom edge width",unit:"%",min:0,max:100,step:1,def:35,hint:"Width of the flat bottom, as a share of the full width. 0% makes a point."}],
+    outline:function(d){var a=d.w/2,t=a*d.tw/100,b=a*d.bw/100,y=d.h*d.sh/100;
+      return [[-t,0],[t,0],[a,y],[b,d.h],[-b,d.h],[-a,y]];}},
   rect:{solve:"h", dims:[W(16),H(27),{k:"r",label:"Corner radius",min:0,max:8,step:0.25,def:1}],
     outline:function(d){
       var a=d.w/2, h=d.h, r=Math.max(0,Math.min(d.r,a,h/2)), n=90;
@@ -265,7 +275,7 @@ var SHAPES = {
     }}
 };
 var MAXR = 11; /* longest side may be at most 11 times the shortest */
-var NAMES = {heater:"Heater",kite:"Kite",teardrop:"Teardrop",round:"Round",rect:"Rectangle"};
+var NAMES = {heater:"Heater",kite:"Kite",teardrop:"Teardrop",round:"Round",oval:"Oval",coffin:"Coffin",rect:"Rectangle"};
 
 /* geometry */
 function clean(pts){var o=[];pts.forEach(function(p){var q=o[o.length-1];if(!q||Math.hypot(p[0]-q[0],p[1]-q[1])>1e-7)o.push(p);});
