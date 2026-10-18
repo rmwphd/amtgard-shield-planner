@@ -2,7 +2,7 @@
 
 A one-page web app for planning LARP shields. Pick a shape and a size class, adjust the dimensions, and see the outline redraw on a 1-inch grid. When you're happy with it, print a full-size pattern to trace onto foam.
 
-**Use it here:** https://YOURNAME.github.io/shield-planner/
+**Use it here:** https://rmwphd.github.io/shield-planner/
 
 ## What it does
 
