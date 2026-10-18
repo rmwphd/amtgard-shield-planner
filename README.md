@@ -56,8 +56,6 @@ Some limits keep every shape buildable:
 5. Measure the 2-inch square on the cover sheet before you cut anything. If it isn't exactly 2 inches, your printer is scaling the page.
 6. Lay the pages out by the page map on the cover sheet. Each page overlaps its neighbors by 1/2 inch along the gray bands. Line up the grid and tape.
 
-Printing works on the hosted page and from the file opened in any browser. It does not work inside the Claude preview.
-
 ## Host your own copy
 
 The whole app is one file, `index.html`. It has no build step and no dependencies to install.
@@ -74,7 +72,3 @@ The whole app is one file, `index.html`. It has no build step and no dependencie
 ## How the math works
 
 Each shape is drawn as a fine-grained outline, and its area is computed from that outline. Results match the exact formula for each shape to within 0.02%, and any error reads slightly low. The Auto dimension is found by searching for the value that hits the target, then rounded down to 1/16 inch. The padded core is an exact inward offset of the finished outline.
-
-## Credits
-
-Built by Reed with help from Claude.
