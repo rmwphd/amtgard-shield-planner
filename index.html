@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important} img{max-width:100%}</style>
+<title>Shield Size Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cutting-mat drawing pinned on top (mobile) or left (desktop); readout and sliders beside it. */
+:root{
+  --bg:#edf1ed; --surface:#fafbf9; --ink:#17211b; --muted:#56665c; --line:#d0d9d2;
+  --accent:#23664a; --accent-ink:#ffffff; --tape:#f2c230;
+  --mat:#2b6246; --mat-minor:rgba(255,255,255,.13); --mat-major:rgba(255,255,255,.32); --mat-text:#e6f0e9;
+  --c-small:#2f7fcf; --c-medium:#b97710; --c-large:#7d52bd; --c-over:#c23c2a; --c-under:#7f8b83;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1511; --surface:#172019; --ink:#e2eae4; --muted:#97a89c; --line:#29352d;
+  --accent:#5cbd8a; --accent-ink:#0b1a11; --mat:#1f4a34; --mat-text:#dbe8df;
+  --c-small:#6ba8ea; --c-medium:#e0a446; --c-large:#a986e2; --c-over:#ee6a54; --c-under:#8c988f;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f1511; --surface:#172019; --ink:#e2eae4; --muted:#97a89c; --line:#29352d;
+  --accent:#5cbd8a; --accent-ink:#0b1a11; --mat:#1f4a34; --mat-text:#dbe8df;
+  --c-small:#6ba8ea; --c-medium:#e0a446; --c-large:#a986e2; --c-over:#ee6a54; --c-under:#8c988f;
+  color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:10px}
+h1{font-family:var(--display);font-weight:700;font-size:1.7rem;letter-spacing:.01em;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);font-size:.92rem}
+.app{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.matcol{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:6px 8px;min-width:0}
+.mat{height:clamp(220px,40vh,420px);border-radius:10px;overflow:hidden;background:var(--mat);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+.mat svg{display:block;width:100%;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.8rem;color:var(--muted);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{width:26px;height:8px}
+.readout{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:8px}
+.area{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.45rem;font-weight:500;letter-spacing:-.01em}
+.area small{font-size:.8rem;color:var(--muted);font-weight:400;margin-left:4px}
+.pill{font-family:var(--display);font-weight:600;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 10px;border-radius:999px;color:#fff;background:var(--c-under)}
+.pill[data-k="small"]{background:var(--c-small)} .pill[data-k="medium"]{background:var(--c-medium)}
+.pill[data-k="large"]{background:var(--c-large)} .pill[data-k="over"]{background:var(--c-over)}
+.detail{color:var(--muted);font-size:.85rem;flex-basis:100%}
+.meter{position:relative;height:10px;border-radius:5px;overflow:hidden;margin-top:8px;display:flex}
+.meter i{display:block;height:100%}
+.meter-wrap{position:relative}
+.marker{position:absolute;top:2px;width:3px;height:16px;margin-left:-1.5px;background:var(--ink);border-radius:2px;transition:left .12s}
+.ticks{position:relative;height:16px;font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.ticks span{position:absolute;top:3px;transform:translateX(-50%);white-space:nowrap}
+.panel{min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:14px}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.lab{font-family:var(--display);font-weight:600;font-size:.82rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+select,input[type=number]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%;min-width:0}
+input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dim{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
+.dim:first-child{border-top:0;padding-top:0}
+.dim-head{display:flex;align-items:center;gap:8px}
+.dim-head label{font-weight:600;flex:1;min-width:0}
+.frac{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.auto{font:600 .75rem var(--display);letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:3px 10px;cursor:pointer}
+.auto[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.dim-ctl{display:flex;align-items:center;gap:10px}
+.dim-ctl input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:28px}
+.num{display:flex;align-items:center;gap:4px;width:6.6rem;flex:none}
+.num span{font-size:.8rem;color:var(--muted);width:1.2rem}
+.dim.solved input{opacity:.55}
+.dim.solved .num input{border-style:dashed}
+.hint{font-size:.8rem;color:var(--muted)}
+.notes{display:flex;flex-direction:column;gap:6px}
+.notes p{margin:0;font-size:.86rem;padding:8px 10px;border-radius:7px;background:color-mix(in srgb,var(--c-medium) 14%,transparent);border-left:3px solid var(--c-medium)}
+.reset{align-self:flex-start;font:600 .85rem var(--display);letter-spacing:.08em;text-transform:uppercase;background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:6px 12px;cursor:pointer}
+footer{margin-top:22px;color:var(--muted);font-size:.85rem;max-width:68ch}
+footer h2{font-family:var(--display);font-size:1.05rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin:0 0 6px}
+footer table{border-collapse:collapse;margin:6px 0 10px;font-variant-numeric:tabular-nums}
+footer td{padding:3px 14px 3px 0;border-bottom:1px solid var(--line)}
+footer p{margin:6px 0}
+@media (min-width:880px){
+  .app{grid-template-columns:minmax(0,1.15fr) minmax(340px,1fr);gap:24px;align-items:start}
+  .matcol{top:calc(env(safe-area-inset-top,0px) + 12px)}
+  .mat{height:min(72vh,660px)}
+}
+@media (prefers-reduced-motion:reduce){.marker{transition:none}}
+.card-title{font-family:var(--display);font-weight:700;font-size:1.15rem;letter-spacing:.02em;margin:0}
+.print-btn{align-self:flex-start;font:700 1rem var(--display);letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+.print-btn:disabled{opacity:.5;cursor:not-allowed}
+select:disabled{opacity:.55}
+
+/* Print pattern: built on demand, shown only when printing. Print is always black on white paper. */
+#print{display:none}
+.page{position:relative;overflow:hidden;contain:strict;break-after:page;page-break-after:always;background:#fff;color:#000;font-family:var(--body)}
+.page:last-child{break-after:auto;page-break-after:auto}
+.page svg{display:block;overflow:hidden}
+.cover{display:flex;flex-direction:column;gap:.18in;padding:.1in}
+.cover h2{font-family:var(--display);font-size:24pt;margin:0;line-height:1.1}
+.cover table{border-collapse:collapse;font-size:10.5pt}
+.cover td{padding:3pt 14pt 3pt 0;border-bottom:.5pt solid #999;vertical-align:top}
+.cover td:first-child{font-weight:600;white-space:nowrap}
+.cover p{margin:0;font-size:10pt;max-width:6.4in}
+.cover .cal{display:flex;gap:.25in;align-items:center;font-size:10pt}
+.cover .cal svg,.cover .map svg{flex:none;max-width:none}
+.cover .map{font-size:9pt}
+@media print{
+  :root{padding:0!important}
+  body{background:#fff!important;margin:0!important}
+  body::before{display:none!important}
+  .wrap{display:none!important}
+  #print{display:block}
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Shield Size Planner</h1>
+    <p>Pick a shape and a size class. Drag the sliders and the outline redraws on a 1-inch grid.</p>
+  </header>
+  <main class="app">
+    <section class="matcol" aria-label="Shield drawing">
+      <div class="mat" id="matBox"><svg id="mat" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shield outline on a one inch grid"></svg></div>
+      <div class="legend" id="legend" hidden>
+        <span><svg viewBox="0 0 26 8"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--accent)" stroke-width="2.5"/></svg>Core outline (cut line)</span>
+        <span><svg viewBox="0 0 26 8"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--c-medium)" stroke-width="2.5" stroke-dasharray="5 3"/></svg>Finished edge with padding</span>
+      </div>
+      <div class="readout">
+        <span class="area" id="area">0 in²</span>
+        <span class="pill" id="pill">Small</span>
+        <span class="detail" id="detail"></span>
+      </div>
+      <div class="meter-wrap">
+        <div class="meter" id="meter"></div>
+        <div class="marker" id="marker"></div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label class="lab" for="shape">Shape</label>
+            <select id="shape">
+              <option value="heater">Heater</option>
+              <option value="kite">Kite</option>
+              <option value="teardrop">Teardrop</option>
+              <option value="round">Round</option>
+              <option value="rect">Rectangle</option>
+            </select></div>
+          <div class="field"><label class="lab" for="target">Target size</label>
+            <select id="target">
+              <option value="free">Free sizing (no target)</option>
+              <option value="small">Max Small (3 ft²)</option>
+              <option value="medium">Max Medium (5 ft²)</option>
+              <option value="large">Max Large (8 ft²)</option>
+              <option value="custom">Custom area</option>
+            </select></div>
+        </div>
+        <div class="row2">
+          <div class="field" id="customField" hidden><label class="lab" for="custom">Custom area (in²)</label>
+            <input type="number" id="custom" min="36" max="1152" step="1" inputmode="decimal"></div>
+          <div class="field" id="marginField"><label class="lab" for="margin">Stay under the max by</label>
+            <select id="margin">
+              <option value="0">Nothing (exact max)</option>
+              <option value="0.005">0.5%</option>
+              <option value="0.01">1%</option>
+              <option value="0.02">2%</option>
+              <option value="0.05">5%</option>
+            </select></div>
+          <div class="field"><label class="lab" for="pad">Edge padding (in)</label>
+            <input type="number" id="pad" min="0" max="3" step="0.25" inputmode="decimal"></div>
+        </div>
+      </div>
+
+      <div class="card" id="dims"></div>
+      <div class="notes" id="notes"></div>
+      <button type="button" class="reset" id="reset">Reset this shape</button>
+
+      <div class="card" id="printCard">
+        <h2 class="card-title">Full-size pattern</h2>
+        <div class="row2">
+          <div class="field"><label class="lab" for="paper">Paper</label>
+            <select id="paper">
+              <option value="letter">US Letter (8.5 × 11 in)</option>
+              <option value="a4">A4 (210 × 297 mm)</option>
+            </select></div>
+          <div class="field"><label class="lab" for="lines">Lines to print</label>
+            <select id="lines">
+              <option value="finished">Finished outline only</option>
+              <option value="core">Core cut line, dashed finished edge</option>
+            </select></div>
+        </div>
+        <div class="hint" id="printInfo"></div>
+        <button type="button" class="print-btn" id="printBtn">Print full-size pattern</button>
+        <div class="hint" id="frameNote" hidden>Printing is blocked inside the Claude preview. Save the HTML file and open it in a browser to print.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <h2>How it measures</h2>
+    <table>
+      <tr><td>Small</td><td>36 in² to 3 ft² (432 in²)</td></tr>
+      <tr><td>Medium</td><td>over 3 ft² to 5 ft² (720 in²)</td></tr>
+      <tr><td>Large</td><td>over 5 ft² to 8 ft² (1152 in²)</td></tr>
+    </table>
+    <p>Face area is the largest flat projection of the shield. Width, height and area here are the finished size, including edge padding. With padding set, the solid line shows the core you cut before padding goes on.</p>
+    <p>When a target is set, the dimension marked Auto is solved for you and rounded down to the nearest 1/16 inch, so cutting to that number keeps you at or under the target.</p>
+  </footer>
+</div>
+<div id="print"></div>
+<style id="pageStyle">@page{size:letter;margin:0.4in}</style>
+
+<script>
+(function(){
+"use strict";
+var LIM = {min:36, small:432, medium:720, large:1152};
+var N = 160;
+var KEY = "shield-planner-v1";
+
+function arc(cx,cy,r,a0,a1,n){var o=[];for(var i=0;i<=n;i++){var t=a0+(a1-a0)*i/n;o.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);}return o;}
+function W(def){return {k:"w",label:"Width",min:6,max:40,step:0.25,def:def,solvable:true};}
+function H(def){return {k:"h",label:"Height",min:6,max:60,step:0.25,def:def,solvable:true};}
+
+var SHAPES = {
+  heater:{solve:"h", minHW:0.5, dims:[W(18),H(28),{k:"s",label:"Straight sides",unit:"%",min:0,max:80,step:1,def:35,hint:"Share of the height before the sides start curving to the point."}],
+    outline:function(d){
+      var a=d.w/2, st=Math.max(0,Math.min(d.h*d.s/100,d.h-a)), b=d.h-st, R=(a*a+b*b)/(2*a), cx=a-R;
+      var te=Math.atan2(b,R-a), right=arc(cx,st,R,0,te,N);
+      var left=right.slice(0,-1).reverse().map(function(p){return [-p[0],p[1]];});
+      return [[-a,0],[a,0]].concat(right,left);
+    }},
+  kite:{solve:"h", dims:[W(18),H(32),{k:"t",label:"Top curve depth",unit:"%",min:5,max:50,step:1,def:28,hint:"How far down the rounded top reaches, as a share of the height. The widest point sits here."}],
+    outline:function(d){
+      var a=d.w/2, t=d.h*d.t/100, o=[];
+      for(var i=0;i<=N;i++){var f=Math.PI-Math.PI*i/N;o.push([a*Math.cos(f),t-t*Math.sin(f)]);}
+      o.push([0,d.h]); return o;
+    }},
+  teardrop:{solve:"h", minHW:1.05, dims:[W(20),H(28)],
+    note:"Round top with straight sides tangent to it. Height must be at least 5% more than width.",
+    outline:function(d){
+      var r=d.w/2, dd=d.h-r, be=Math.acos(Math.min(1,r/dd)), s=Math.PI-be, o=[], ang=[Math.PI/2,-Math.PI/2];
+      for(var i=0;i<=N;i++)ang.push(s-2*s*i/N);
+      ang.sort(function(x,y){return y-x;}).forEach(function(p){o.push([r*Math.sin(p),r-r*Math.cos(p)]);});
+      o.push([0,d.h]); return o;
+    }},
+  round:{solve:"d", dims:[{k:"d",label:"Diameter",min:6,max:48,step:0.25,def:23,solvable:true}],
+    outline:function(d){var r=d.d/2; return arc(0,r,r,-Math.PI/2,1.5*Math.PI,N*2).slice(0,-1);}},
+  rect:{solve:"h", dims:[W(16),H(27),{k:"r",label:"Corner radius",min:0,max:8,step:0.25,def:1}],
+    outline:function(d){
+      var a=d.w/2, h=d.h, r=Math.max(0,Math.min(d.r,a,h/2)), n=90;
+      if(r<1e-6) return [[-a,0],[a,0],[a,h],[-a,h]];
+      return [].concat(arc(a-r,r,r,-Math.PI/2,0,n),arc(a-r,h-r,r,0,Math.PI/2,n),arc(-a+r,h-r,r,Math.PI/2,Math.PI,n),arc(-a+r,r,r,Math.PI,1.5*Math.PI,n));
+    }}
+};
+var MAXR = 11; /* longest side may be at most 11 times the shortest */
+var NAMES = {heater:"Heater",kite:"Kite",teardrop:"Teardrop",round:"Round",rect:"Rectangle"};
+
+/* geometry */
+function clean(pts){var o=[];pts.forEach(function(p){var q=o[o.length-1];if(!q||Math.hypot(p[0]-q[0],p[1]-q[1])>1e-7)o.push(p);});
+  if(o.length>1){var f=o[0],l=o[o.length-1];if(Math.hypot(f[0]-l[0],f[1]-l[1])<1e-7)o.pop();}return o;}
+function sArea(p){var s=0;for(var i=0,n=p.length;i<n;i++){var a=p[i],b=p[(i+1)%n];s+=a[0]*b[1]-b[0]*a[1];}return s/2;}
+function area(p){return Math.abs(sArea(p));}
+/* Inward offset of a convex outline: clip it by every edge's half-plane shifted inward by pad.
+   Exact for convex shapes and never self-intersects, even at sharp points. */
+function inset(pts,pad){
+  var A=sArea(pts), sg=A>0?1:-1, n=pts.length, poly=pts.slice();
+  for(var i=0;i<n&&poly.length>2;i++){
+    var a=pts[i],b=pts[(i+1)%n],dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);
+    var nx=-sg*dy/L, ny=sg*dx/L, c=nx*a[0]+ny*a[1]+pad, out=[], m=poly.length;
+    for(var j=0;j<m;j++){var P=poly[j],Q=poly[(j+1)%m],dp=nx*P[0]+ny*P[1]-c,dq=nx*Q[0]+ny*Q[1]-c;
+      if(dp>=0)out.push(P);
+      if((dp>=0)!==(dq>=0)){var t=dp/(dp-dq);out.push([P[0]+t*(Q[0]-P[0]),P[1]+t*(Q[1]-P[1])]);}}
+    poly=out;
+  }
+  poly=clean(poly); return poly.length>2&&area(poly)>=1?poly:null;
+}
+function bbox(p){var b={x0:1e9,y0:1e9,x1:-1e9,y1:-1e9};p.forEach(function(q){b.x0=Math.min(b.x0,q[0]);b.x1=Math.max(b.x1,q[0]);b.y0=Math.min(b.y0,q[1]);b.y1=Math.max(b.y1,q[1]);});return b;}
+function outer(sh,d){return clean(SHAPES[sh].outline(d));}
+function geom(sh,d,pad){
+  var o=outer(sh,d), core=pad>0?inset(o,pad):null;
+  return {outer:o, A:area(o), core:core, coreA:core?area(core):0};
+}
+function hasWH(sh){return SHAPES[sh].dims.some(function(x){return x.k==="w";});}
+function solveDim(sh,d,k,T){
+  var lo=0.5, hi=120, rlo=false, rhi=false, hmin=SHAPES[sh].minHW||1/MAXR;
+  if(hasWH(sh)&&k==="h"){if(d.w*hmin>lo)lo=d.w*hmin; if(d.w*MAXR<hi){hi=d.w*MAXR;rhi=true;}}
+  if(hasWH(sh)&&k==="w"){if(d.h/MAXR>lo){lo=d.h/MAXR;rlo=true;} if(d.h/hmin<hi)hi=d.h/hmin;}
+  var lo0=lo;
+  var f=function(x){var c={};for(var q in d)c[q]=d[q];c[k]=x;return area(outer(sh,c));};
+  if(f(lo)>=T) return {x:lo,ok:false,why:"big",ratio:rlo};
+  if(f(hi)<=T) return {x:hi,ok:false,why:"small",ratio:rhi};
+  for(var i=0;i<50;i++){var m=(lo+hi)/2; if(f(m)>T) hi=m; else lo=m;}
+  var x=Math.floor(lo*16+1e-9)/16; return {x:Math.max(x,lo0),ok:true};
+}
+
+/* formatting */
+function fmt(x,dp){return (+x.toFixed(dp)).toString();}
+function a1(x){return x.toFixed(1);}
+function frac(x,floor){
+  var n=floor?Math.floor(x*16+1e-6):Math.round(x*16), exact=Math.abs(x*16-n)<1e-4;
+  var w=Math.floor(n/16), r=n%16, den=16; while(r&&r%2===0){r/=2;den/=2;}
+  var s=r?(w?w+" "+r+"/"+den:r+"/"+den)+"″":w+"″"; return exact?s:"≈ "+s;
+}
+
+/* state */
+function defaults(){var o={};for(var sh in SHAPES){o[sh]={};SHAPES[sh].dims.forEach(function(dm){o[sh][dm.k]=dm.def;});}return o;}
+var state={shape:"heater",target:"small",margin:0,custom:500,pad:0,dims:defaults(),solve:{}};
+for(var sh0 in SHAPES) state.solve[sh0]=SHAPES[sh0].solve;
+try{var saved=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(saved&&SHAPES[saved.shape]){["shape","target","margin","custom","pad"].forEach(function(k){if(k in saved)state[k]=saved[k];});
+    for(var s1 in SHAPES){if(saved.dims&&saved.dims[s1])for(var k1 in state.dims[s1]){var v=+saved.dims[s1][k1];if(v>=0)state.dims[s1][k1]=v;}
+      if(saved.solve&&s1 in saved.solve)state.solve[s1]=saved.solve[s1];}}
+}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+
+var $=function(id){return document.getElementById(id);};
+var dimsEl=$("dims"), notes=[];
+
+function solveKey(){return state.target==="free"?null:state.solve[state.shape];}
+function targetArea(){var t=state.target; if(t==="free")return null; if(t==="custom")return Math.max(1,+state.custom||0); return LIM[t]*(1-state.margin);}
+
+function buildDims(){
+  var S=SHAPES[state.shape]; dimsEl.innerHTML="";
+  S.dims.forEach(function(dm){
+    var u=dm.unit||"in", el=document.createElement("div"); el.className="dim"; el.dataset.k=dm.k;
+    el.innerHTML='<div class="dim-head"><label for="n-'+dm.k+'">'+dm.label+'</label><span class="frac" id="f-'+dm.k+'"></span>'+
+      (dm.solvable?'<button type="button" class="auto" id="a-'+dm.k+'" aria-pressed="false" title="Solve this dimension to hit the target">Auto</button>':'')+'</div>'+
+      '<div class="dim-ctl"><input type="range" id="r-'+dm.k+'" min="'+dm.min+'" max="'+dm.max+'" step="'+dm.step+'" aria-label="'+dm.label+'">'+
+      '<div class="num"><input type="number" id="n-'+dm.k+'" min="0" step="'+dm.step+'" inputmode="decimal"><span>'+(u==="%"?"%":"in")+'</span></div></div>'+
+      (dm.hint?'<div class="hint">'+dm.hint+'</div>':'');
+    dimsEl.appendChild(el);
+    var r=$("r-"+dm.k), n=$("n-"+dm.k), a=$("a-"+dm.k);
+    r.addEventListener("input",function(){state.dims[state.shape][dm.k]=+r.value;recompute(dm.k);});
+    n.addEventListener("input",function(){var v=parseFloat(n.value);if(!(v>=0))return;if(u!=="%"&&v<0.5)return;state.dims[state.shape][dm.k]=v;recompute(dm.k);});
+    n.addEventListener("blur",function(){if(n.isConnected)update();});
+    if(a)a.addEventListener("click",function(){state.solve[state.shape]=state.solve[state.shape]===dm.k?null:dm.k;recompute();});
+  });
+  if(S.note){var h=document.createElement("div");h.className="hint";h.textContent=S.note;dimsEl.appendChild(h);}
+}
+
+function recompute(edited){
+  var sh=state.shape, d=state.dims[sh], sk=solveKey(); notes=[];
+  SHAPES[sh].dims.forEach(function(dm){var v=+d[dm.k]; if(!isFinite(v))v=dm.def;
+    d[dm.k]=dm.unit==="%"?Math.min(dm.max,Math.max(dm.min,v)):Math.min(120,Math.max(0.5,v));});
+  var hmin=SHAPES[sh].minHW||1/MAXR;
+  if(hasWH(sh)&&sk!=="w"&&sk!=="h"&&(d.h<d.w*hmin-1e-9||d.h>d.w*MAXR+1e-9)){
+    var tooTall=d.h>d.w*MAXR;
+    if(edited==="w") d.w=Math.min(Math.max(d.w,d.h/MAXR),d.h/hmin);
+    else d.h=Math.min(Math.max(d.h,d.w*hmin),d.w*MAXR);
+    notes.push(tooTall||hmin===1/MAXR
+      ? "Shields are limited to an 11:1 ratio of height to width, so that value stopped at the limit."
+      : sh==="teardrop" ? "A teardrop's height has to be at least 5% more than its width, so that value stopped at the limit."
+      : "A heater has to be at least half as tall as it is wide to keep its point, so that value stopped at the limit.");
+  }
+  if(sh==="rect"){var mx=Math.min(d.w,d.h)/2; if(d.r>mx){d.r=Math.floor(mx*4)/4;}}
+  var T=targetArea();
+  if(T&&sk){
+    var res=solveDim(sh,d,sk,T), lab=SHAPES[sh].dims.filter(function(x){return x.k===sk;})[0].label.toLowerCase();
+    d[sk]=res.x;
+    if(!res.ok) notes.push(res.ratio
+      ? "The target can't be reached without going past the 11:1 shape limit. Change the other dimension."
+      : res.why==="big"
+      ? "The shield is over the target even at the smallest "+lab+". Shrink one of the other dimensions."
+      : "Changing "+lab+" alone can't reach the target. Make one of the other dimensions bigger.");
+  }
+  if(sh==="heater"){var smax=Math.max(0,(d.h-d.w/2)/d.h*100);
+    if(d.s>smax+1e-9){d.s=Math.floor(smax);notes.push("Straight sides were shortened so the curved part stays at least half the width tall. That keeps a clean point.");}}
+  update(); save();
+}
+
+function classify(A){
+  var c=function(k,name,lim,label){var h=lim-A;return {k:k,name:name,detail:h<0.05?"At the "+label+" max":a1(h)+" in² under the "+label+" max ("+lim+" in²)"};};
+  if(A<LIM.min) return {k:"under",name:"Too small",detail:a1(LIM.min-A)+" in² below the 36 in² minimum"};
+  if(A<=LIM.small) return c("small","Small",LIM.small,"Small");
+  if(A<=LIM.medium) return c("medium","Medium",LIM.medium,"Medium");
+  if(A<=LIM.large) return c("large","Large",LIM.large,"Large");
+  return {k:"over",name:"Over limit",detail:a1(A-LIM.large)+" in² over the 8 ft² Large max"};
+}
+
+var SCALE=1200;
+function buildMeter(){
+  var segs=[[0,36,"var(--c-under)"],[36,432,"var(--c-small)"],[432,720,"var(--c-medium)"],[720,1152,"var(--c-large)"],[1152,SCALE,"var(--c-over)"]];
+  $("meter").innerHTML=segs.map(function(s){return '<i style="width:'+((s[1]-s[0])/SCALE*100)+'%;background:'+s[2]+';opacity:.75"></i>';}).join("");
+  $("ticks").innerHTML=[[432,"3 ft²"],[720,"5 ft²"],[1152,"8 ft²"]].map(function(t){return '<span style="left:'+(t[0]/SCALE*100)+'%">'+t[1]+'</span>';}).join("");
+}
+
+function update(){
+  var sh=state.shape, S=SHAPES[sh], d=state.dims[sh], sk=solveKey(), g=geom(sh,d,state.pad);
+  S.dims.forEach(function(dm){
+    var r=$("r-"+dm.k), n=$("n-"+dm.k), f=$("f-"+dm.k), a=$("a-"+dm.k), v=d[dm.k], solved=sk===dm.k;
+    if(!r||!n||!f) return;
+    r.value=Math.min(dm.max,Math.max(dm.min,v));
+    if(document.activeElement!==n||n.readOnly) n.value=fmt(v,dm.unit==="%"?0:4);
+    f.textContent=dm.unit==="%"?"":(solved?"≤ ":"")+frac(v,solved).replace("≈ ","");
+    if(dm.unit!=="%"&&!solved) f.textContent=frac(v,false);
+    r.disabled=solved; n.readOnly=solved;
+    r.closest(".dim").classList.toggle("solved",solved);
+    if(a){a.hidden=state.target==="free"; a.setAttribute("aria-pressed",solved?"true":"false");}
+  });
+  var c=classify(g.A), T=targetArea();
+  $("area").innerHTML=a1(g.A)+" in²<small>"+(g.A/144).toFixed(2)+" ft²</small>";
+  var pill=$("pill"); pill.textContent=c.name; pill.dataset.k=c.k;
+  var det=c.detail;
+  if(T&&!sk) det+=". Target is "+a1(T)+" in². Mark a dimension Auto to solve for it.";
+  if(state.pad>0){
+    if(g.core){var cb=bbox(g.core);det+=". Core before padding: "+frac(cb.x1-cb.x0,true).replace("≈ ","")+" × "+frac(cb.y1-cb.y0,true).replace("≈ ","")+", "+a1(g.coreA)+" in²";}
+    else notes.push("The padding is too thick for a shield this size, so no core outline can be drawn.");
+  }
+  $("detail").textContent=det;
+  $("marker").style.left=Math.min(100,g.A/SCALE*100)+"%";
+  $("legend").hidden=!(state.pad>0&&g.core);
+  $("customField").hidden=state.target!=="custom";
+  $("marginField").hidden=state.target==="free"||state.target==="custom";
+  $("notes").innerHTML=notes.map(function(t){return "<p>"+t+"</p>";}).join("");
+  printInfo(g);
+  draw(g,d,sh);
+}
+
+function draw(g,d,sh){
+  var svg=$("mat"), box=$("matBox").getBoundingClientRect(), asp=box.width/Math.max(1,box.height)||0.8;
+  var b=bbox(g.outer), Wd=b.x1-b.x0, Hd=b.y1-b.y0, M=7;
+  var vh=Math.ceil(Math.max(Hd+2*M,(Wd+2*M)/asp)/6)*6, vw=vh*asp, x0=Wd/2-vw/2, y0=Hd/2-vh/2, fs=vh/44;
+  var P=function(p){return (p[0]-b.x0).toFixed(3)+" "+(p[1]-b.y0).toFixed(3);};
+  var path=function(pts){return "M"+pts.map(P).join("L")+"Z";};
+  var mi="",ma="",lab="",x,y;
+  for(x=Math.ceil(x0);x<=x0+vw;x++){var sx="M"+x+" "+y0.toFixed(2)+"V"+(y0+vh).toFixed(2);if(x%6===0)ma+=sx;else mi+=sx;
+    if(x%6===0&&x>=0)lab+='<text x="'+x+'" y="'+(y0+fs*1.4).toFixed(2)+'" text-anchor="middle">'+x+'</text>';}
+  for(y=Math.ceil(y0);y<=y0+vh;y++){var sy="M"+x0.toFixed(2)+" "+y+"H"+(x0+vw).toFixed(2);if(y%6===0)ma+=sy;else mi+=sy;
+    if(y%6===0&&y>0)lab+='<text x="'+(x0+fs*0.6).toFixed(2)+'" y="'+y+'" dominant-baseline="middle">'+y+'</text>';}
+  var ns='vector-effect="non-scaling-stroke"';
+  var shield;
+  if(g.core){
+    shield='<path d="'+path(g.outer)+'" fill="rgba(242,194,48,.10)" stroke="var(--tape)" stroke-width="2" stroke-dasharray="7 5" '+ns+'/>'+
+           '<path d="'+path(g.core)+'" fill="rgba(255,255,255,.16)" stroke="#ffffff" stroke-width="2.5" '+ns+'/>';
+  } else {
+    shield='<path d="'+path(g.outer)+'" fill="rgba(255,255,255,.16)" stroke="#ffffff" stroke-width="2.5" '+ns+'/>';
+  }
+  var dy=-2, dx=Wd+2, t=0.45, dim='';
+  var lbl=sh==="round"?"Ø "+frac(Wd,solveKey()==="d").replace("≈ ",""):frac(Wd,solveKey()==="w");
+  dim+='<path d="M0 '+dy+'H'+Wd.toFixed(3)+'M0 '+(dy-t)+'V'+(dy+t)+'M'+Wd.toFixed(3)+' '+(dy-t)+'V'+(dy+t)+'" stroke="var(--tape)" stroke-width="1.5" fill="none" '+ns+'/>';
+  dim+='<text class="dl" x="'+(Wd/2).toFixed(3)+'" y="'+(dy-0.7).toFixed(3)+'" text-anchor="middle">'+lbl+'</text>';
+  if(sh!=="round"){
+    dim+='<path d="M'+dx+' 0V'+Hd.toFixed(3)+'M'+(dx-t)+' 0H'+(dx+t)+'M'+(dx-t)+' '+Hd.toFixed(3)+'H'+(dx+t)+'" stroke="var(--tape)" stroke-width="1.5" fill="none" '+ns+'/>';
+    dim+='<text class="dl" x="'+(dx+0.7)+'" y="'+(Hd/2).toFixed(3)+'" text-anchor="middle" transform="rotate(90 '+(dx+0.7)+' '+(Hd/2).toFixed(3)+')">'+frac(Hd,solveKey()==="h")+'</text>';
+  }
+  svg.setAttribute("viewBox",x0.toFixed(3)+" "+y0.toFixed(3)+" "+vw.toFixed(3)+" "+vh.toFixed(3));
+  svg.innerHTML='<rect x="'+x0+'" y="'+y0+'" width="'+vw+'" height="'+vh+'" fill="var(--mat)"/>'+
+    '<path d="'+mi+'" stroke="var(--mat-minor)" stroke-width="1" '+ns+'/>'+
+    '<path d="'+ma+'" stroke="var(--mat-major)" stroke-width="1.4" '+ns+'/>'+
+    '<g fill="var(--mat-text)" font-family="IBM Plex Mono, monospace" font-size="'+fs.toFixed(3)+'" opacity=".75">'+lab+'</g>'+
+    shield+
+    '<g font-family="IBM Plex Mono, monospace" font-size="'+(fs*1.2).toFixed(3)+'" fill="var(--tape)" style="paint-order:stroke" stroke="var(--mat)" stroke-width="'+(fs*0.35).toFixed(3)+'">'+dim+'</g>';
+}
+
+/* ---------- full-size print pattern ---------- */
+var PAPER={letter:{w:8.5,h:11,name:"US Letter"},a4:{w:210/25.4,h:297/25.4,name:"A4"}};
+var PM=0.4, OV=0.5; /* page margin and tile overlap, inches */
+var printOpts={paper:"letter",lines:"finished"};
+function densify(pts,step){var o=[];for(var i=0,n=pts.length;i<n;i++){var a=pts[i],b=pts[(i+1)%n],k=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/step));
+  for(var j=0;j<k;j++)o.push([a[0]+(b[0]-a[0])*j/k,a[1]+(b[1]-a[1])*j/k]);}return o;}
+function inPoly(p,poly){var c=false;for(var i=0,j=poly.length-1;i<poly.length;j=i++){var a=poly[i],b=poly[j];
+  if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
+function tiling(g,paper){
+  var P=PAPER[paper], pw=P.w-2*PM, ph=P.h-2*PM-0.02, sx=pw-OV, sy=ph-OV, b=bbox(g.outer), Wd=b.x1-b.x0, Hd=b.y1-b.y0, m=0.5;
+  var cols=Math.max(1,Math.ceil((Wd+2*m-OV)/sx)), rows=Math.max(1,Math.ceil((Hd+2*m-OV)/sy));
+  var ox=(cols*sx+OV-Wd)/2, oy=(rows*sy+OV-Hd)/2;
+  var toSheet=function(p){return [p[0]-b.x0+ox,p[1]-b.y0+oy];};
+  var sheetOuter=g.outer.map(toSheet), dense=densify(sheetOuter,0.05), tiles=[];
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var x=c*sx,y=r*sy,used=inPoly([x+pw/2,y+ph/2],sheetOuter)||dense.some(function(p){return p[0]>=x&&p[0]<=x+pw&&p[1]>=y&&p[1]<=y+ph;});
+    tiles.push({r:r,c:c,x:x,y:y,used:used,label:String.fromCharCode(65+r)+(c+1)});}
+  return {P:P,pw:pw,ph:ph,sx:sx,sy:sy,cols:cols,rows:rows,ox:ox,oy:oy,Wd:Wd,Hd:Hd,toSheet:toSheet,tiles:tiles,used:tiles.filter(function(t){return t.used;})};
+}
+function printInfo(g){
+  var T=tiling(g,printOpts.paper), lines=$("lines");
+  lines.disabled=!(state.pad>0&&g.core); if(lines.disabled)lines.value="finished"; else lines.value=printOpts.lines;
+  $("printInfo").textContent="A cover sheet plus "+T.used.length+" pattern page"+(T.used.length===1?"":"s")+" on "+T.P.name+
+    " ("+T.cols+" across, "+T.rows+" down). Print at 100% scale with Fit to page turned off.";
+}
+function buildPrint(){
+  var sh=state.shape, d=state.dims[sh], g=geom(sh,d,state.pad), T=tiling(g,printOpts.paper), useCore=printOpts.lines==="core"&&state.pad>0&&g.core;
+  var c=classify(g.A), P=function(p){var q=T.toSheet(p);return q[0].toFixed(4)+" "+q[1].toFixed(4);};
+  var path=function(pts){return "M"+pts.map(P).join("L")+"Z";};
+  $("pageStyle").textContent="@page{size:"+(printOpts.paper==="a4"?"A4":"letter")+";margin:"+PM+"in}";
+  var pageCss='style="width:'+T.pw+'in;height:'+T.ph+'in"';
+  var outlines=useCore
+    ? '<path d="'+path(g.outer)+'" fill="none" stroke="#000" stroke-width="0.02" stroke-dasharray="0.25 0.15"/><path d="'+path(g.core)+'" fill="none" stroke="#000" stroke-width="0.03"/>'
+    : '<path d="'+path(g.outer)+'" fill="none" stroke="#000" stroke-width="0.03"/>';
+  var cx=T.ox+T.Wd/2, totW=T.cols*T.sx+OV, totH=T.rows*T.sy+OV;
+  var rows=[["Shape",NAMES[sh]],["Finished size",frac(T.Wd,false)+" wide × "+frac(T.Hd,false)+" tall"],
+    ["Face area",a1(g.A)+" in² ("+(g.A/144).toFixed(2)+" ft²), "+c.name]];
+  SHAPES[sh].dims.forEach(function(dm){if(dm.unit==="%")rows.push([dm.label,fmt(d[dm.k],0)+"% of height"]);if(dm.k==="r")rows.push([dm.label,frac(d.r,false)]);});
+  rows.push(["Edge padding",state.pad>0?frac(state.pad,false):"None"]);
+  if(g.core){var cb=bbox(g.core);rows.push(["Core before padding",frac(cb.x1-cb.x0,true).replace("≈ ","")+" × "+frac(cb.y1-cb.y0,true).replace("≈ ","")+", "+a1(g.coreA)+" in²"]);}
+  rows.push(["Lines printed",useCore?"Solid: core cut line. Dashed: finished edge.":"Solid: finished outline."]);
+  /* cover */
+  var ms=Math.min(4.2/totW,3.6/totH), map='<svg width="'+(totW*ms).toFixed(3)+'in" height="'+(totH*ms).toFixed(3)+'in" viewBox="0 0 '+totW+' '+totH+'">';
+  T.tiles.forEach(function(t){map+='<rect x="'+t.x+'" y="'+t.y+'" width="'+T.pw+'" height="'+T.ph+'" fill="'+(t.used?"none":"#eee")+'" stroke="#888" stroke-width="0.04"/>'+
+    '<text x="'+(t.x+T.sx/2)+'" y="'+(t.y+T.sy/2)+'" font-size="1.6" text-anchor="middle" dominant-baseline="middle" fill="'+(t.used?"#000":"#aaa")+'">'+(t.used?t.label:"skip")+'</text>';});
+  map+='<path d="'+path(g.outer)+'" fill="none" stroke="#000" stroke-width="0.12"/></svg>';
+  var html='<div class="page cover" '+pageCss+'><h2>'+NAMES[sh]+' shield pattern</h2><table>'+
+    rows.map(function(r){return "<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>";}).join("")+'</table>'+
+    '<p>Print at 100% (Actual size) with Fit to page turned off. Check the square below with a ruler before cutting anything.</p>'+
+    '<div class="cal"><svg width="2in" height="2in" viewBox="0 0 2 2"><rect x="0.01" y="0.01" width="1.98" height="1.98" fill="none" stroke="#000" stroke-width="0.02"/></svg>'+
+    '<div>This square should measure exactly <b>2 inches</b> (50.8 mm) on each side, outer edge to outer edge. If it doesn’t, your printer is scaling the page.</div></div>'+
+    '<p>Pages overlap by 1/2 inch along the gray bands. Lay them out by the map, line up the 1-inch grid, and tape. The dash-dot line is the center line.</p>'+
+    '<div class="map">'+map+'<div>Page map. Gray pages are blank and are not printed.</div></div></div>';
+  /* tiles */
+  T.used.forEach(function(t){
+    var s='<svg width="'+T.pw+'in" height="'+T.ph+'in" viewBox="'+t.x+' '+t.y+' '+T.pw+' '+T.ph+'">';
+    var gl="",GL="";
+    for(var k=Math.ceil(t.x-T.ox);T.ox+k<=t.x+T.pw;k++){var X=(T.ox+k).toFixed(4),ln="M"+X+" "+t.y+"V"+(t.y+T.ph);if(k%6===0)GL+=ln;else gl+=ln;}
+    for(k=Math.ceil(t.y-T.oy);T.oy+k<=t.y+T.ph;k++){var Y=(T.oy+k).toFixed(4),lh="M"+t.x+" "+Y+"H"+(t.x+T.pw);if(k%6===0)GL+=lh;else gl+=lh;}
+    s+='<path d="'+gl+'" stroke="#bbb" stroke-width="0.008"/><path d="'+GL+'" stroke="#888" stroke-width="0.014"/>';
+    if(t.c<T.cols-1)s+='<rect x="'+(t.x+T.pw-OV)+'" y="'+t.y+'" width="'+OV+'" height="'+T.ph+'" fill="#000" fill-opacity="0.07"/>';
+    if(t.r<T.rows-1)s+='<rect x="'+t.x+'" y="'+(t.y+T.ph-OV)+'" width="'+T.pw+'" height="'+OV+'" fill="#000" fill-opacity="0.07"/>';
+    s+='<path d="M'+cx+' '+t.y+'V'+(t.y+T.ph)+'" stroke="#000" stroke-width="0.012" stroke-dasharray="0.4 0.1 0.05 0.1"/>';
+    s+=outlines;
+    s+='<rect x="'+t.x+'" y="'+t.y+'" width="'+T.pw+'" height="'+T.ph+'" fill="none" stroke="#000" stroke-width="0.01"/>';
+    var lx=t.x+0.15, ly=t.y+0.15;
+    s+='<rect x="'+lx+'" y="'+ly+'" width="1.7" height="0.78" fill="#fff" stroke="#000" stroke-width="0.01"/>'+
+       '<text x="'+(lx+0.1)+'" y="'+(ly+0.42)+'" font-size="0.36" font-weight="700" font-family="Barlow Condensed, Arial Narrow, sans-serif">'+t.label+'</text>'+
+       '<text x="'+(lx+0.75)+'" y="'+(ly+0.3)+'" font-size="0.13" font-family="sans-serif">'+NAMES[sh]+'</text>'+
+       '<text x="'+(lx+0.75)+'" y="'+(ly+0.48)+'" font-size="0.13" font-family="sans-serif">Page '+t.label+'</text>'+
+       '<path d="M'+(lx+0.1)+' '+(ly+0.62)+'h1M'+(lx+0.1)+' '+(ly+0.56)+'v0.12M'+(lx+1.1)+' '+(ly+0.56)+'v0.12" stroke="#000" stroke-width="0.012"/>'+
+       '<text x="'+(lx+1.18)+'" y="'+(ly+0.66)+'" font-size="0.12" font-family="sans-serif">1 in</text>';
+    html+='<div class="page" '+pageCss+'>'+s+'</svg></div>';
+  });
+  $("print").innerHTML=html;
+}
+
+/* wiring */
+$("shape").value=state.shape; $("target").value=state.target; $("margin").value=String(state.margin);
+$("custom").value=state.custom; $("pad").value=state.pad;
+$("shape").addEventListener("change",function(e){state.shape=e.target.value;buildDims();recompute();});
+$("target").addEventListener("change",function(e){state.target=e.target.value;if(state.target!=="free"&&!state.solve[state.shape])state.solve[state.shape]=SHAPES[state.shape].solve;recompute();});
+$("margin").addEventListener("change",function(e){state.margin=+e.target.value;recompute();});
+$("custom").addEventListener("input",function(e){var v=parseFloat(e.target.value);if(v>=1){state.custom=v;recompute();}});
+$("pad").addEventListener("input",function(e){var v=parseFloat(e.target.value);if(v>=0){state.pad=Math.min(v,6);recompute();}});
+$("reset").addEventListener("click",function(){var sh=state.shape;SHAPES[sh].dims.forEach(function(dm){state.dims[sh][dm.k]=dm.def;});state.solve[sh]=SHAPES[sh].solve;recompute();});
+try{var po=JSON.parse(localStorage.getItem(KEY+"-print")||"null");if(po&&PAPER[po.paper])printOpts=po;}catch(e){}
+$("paper").value=printOpts.paper;
+function savePrint(){try{localStorage.setItem(KEY+"-print",JSON.stringify(printOpts));}catch(e){}}
+$("paper").addEventListener("change",function(e){printOpts.paper=e.target.value;savePrint();update();});
+$("lines").addEventListener("change",function(e){printOpts.lines=e.target.value;savePrint();update();});
+$("printBtn").addEventListener("click",function(){buildPrint();window.print();});
+window.addEventListener("beforeprint",buildPrint);
+var framed=false; try{framed=window.self!==window.top;}catch(e){framed=true;}
+$("frameNote").hidden=!framed;
+buildMeter(); buildDims(); recompute();
+if(window.ResizeObserver) new ResizeObserver(function(){update();}).observe($("matBox"));
+})();
+</script>
+
+</body>
+</html>
