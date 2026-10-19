@@ -7,7 +7,8 @@ https://rmwphd.github.io/amtgard-shield-planner/
 
 ## What it does
 
-- Sizes seven shapes: heater, kite, teardrop, round, oval, coffin, and rectangle.
+- Sizes eight shapes: heater, kite, teardrop, round, oval, coffin, Wankel, and rectangle.
+- Rounds sharp corners and points to any radius up to 3 inches, which makes shields easier to build.
 - Targets a size class. Pick Max Small, Max Medium, Max Large, or a custom area. The dimension marked **Auto** is solved for you.
 - Rounds solved dimensions down to the nearest 1/16 inch, so cutting to the number keeps you at or under the limit.
 - Lets you aim a little under the max with an optional safety margin (0.5% to 5%).
@@ -30,17 +31,18 @@ If your group uses different limits, change the `LIM` values near the top of the
 
 ## Shapes
 
-Every shape has width and height. Some have one to three extra sliders.
+Most shapes have width and height. Some have extra sliders. Every shape with sharp corners has a **Corner radius** slider (0 to 3 inches, default 1/2 inch) that rounds every corner and point. Width and height always stay the finished size you set.
 
 | Shape | Extra controls |
 |-------|----------------|
-| Heater | Straight sides (share of height before the curve to the point) |
+| Heater | Straight sides (share of height before the sides turn in), lower curve (0% for straight lines to the point, 100% for the classic rounded curve) |
 | Kite | Top curve depth (where the rounded top meets the straight sides) |
 | Teardrop | None. The sides are straight and tangent to a round top. |
 | Round | Diameter only |
 | Oval | None |
 | Coffin | Shoulder position, top edge width, bottom edge width |
-| Rectangle | Corner radius |
+| Wankel | Width only. A Reuleaux triangle, point down, named for the Wankel rotary engine. With sharp corners it is exactly as tall as it is wide. Rounded corners make it slightly shorter. |
+| Rectangle | Corner radius (up to 8 inches) |
 
 Some limits keep every shape buildable:
 
@@ -66,10 +68,10 @@ The whole app is one file, `index.html`. It has no build step and no dependencie
 1. Click **Fork** at the top of this page.
 2. In your fork, go to **Settings → Pages**.
 3. Under "Build and deployment," choose **Deploy from a branch**, then `main` and `/ (root)`. Click **Save**.
-4. After a minute or two, your copy is live at `https://YOUR-USERNAME.github.io/shield-planner/`.
+4. After a minute or two, your copy is live at `https://YOUR-USERNAME.github.io/amtgard-shield-planner/`.
 
 **Without GitHub:** download `index.html` and drag it onto [Netlify Drop](https://app.netlify.com/drop), or open it directly in a browser.
 
 ## How the math works
 
-Each shape is drawn as a fine-grained outline, and its area is computed from that outline. Results match the exact formula for each shape to within 0.02%, and any error reads slightly low. The Auto dimension is found by searching for the value that hits the target, then rounded down to 1/16 inch. The padded core is an exact inward offset of the finished outline.
+Each shape is drawn as a fine-grained outline, and its area is computed from that outline. Results match the exact formula for each shape to within 0.02%, and any error reads slightly low. The Auto dimension is found by searching for the value that hits the target, then rounded down to 1/16 inch. Rounded corners are made by shrinking the outline by the corner radius and growing it back, which gives every corner exactly that radius. The padded core is an exact inward offset of the finished outline.

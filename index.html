@@ -158,6 +158,7 @@ select:disabled{opacity:.55}
               <option value="round">Round</option>
               <option value="oval">Oval</option>
               <option value="coffin">Coffin</option>
+              <option value="wankel">Wankel (Reuleaux)</option>
               <option value="rect">Rectangle</option>
             </select></div>
           <div class="field"><label class="lab" for="target">Target size</label>
@@ -234,22 +235,33 @@ var KEY = "shield-planner-v1";
 function arc(cx,cy,r,a0,a1,n){var o=[];for(var i=0;i<=n;i++){var t=a0+(a1-a0)*i/n;o.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);}return o;}
 function W(def){return {k:"w",label:"Width",min:6,max:40,step:0.25,def:def,solvable:true};}
 function H(def){return {k:"h",label:"Height",min:6,max:60,step:0.25,def:def,solvable:true};}
+function CR(){return {k:"cr",label:"Corner radius",min:0,max:3,step:0.125,def:0.5,hint:"Rounds every sharp corner, including the point. Width and height stay as set."};}
 
 var SHAPES = {
-  heater:{solve:"h", minHW:0.5, dims:[W(18),H(28),{k:"s",label:"Straight sides",unit:"%",min:0,max:80,step:1,def:35,hint:"Share of the height before the sides start curving to the point."}],
+  heater:{solve:"h", minHW:0.5, dims:[W(18),H(28),
+    {k:"s",label:"Straight sides",unit:"%",min:0,max:80,step:1,def:35,hint:"Share of the height before the sides turn in toward the point."},
+    {k:"c",label:"Lower curve",unit:"%",min:0,max:100,step:1,def:100,hint:"0% gives straight lines down to the point. 100% is the classic rounded heater curve."},CR()],
     outline:function(d){
-      var a=d.w/2, st=Math.max(0,Math.min(d.h*d.s/100,d.h-a)), b=d.h-st, R=(a*a+b*b)/(2*a), cx=a-R;
-      var te=Math.atan2(b,R-a), right=arc(cx,st,R,0,te,N);
+      var a=d.w/2, st=Math.max(0,Math.min(d.h*d.s/100,d.h-a)), b=d.h-st, c=(d.c==null?100:d.c)/100, right;
+      /* lower section: circular arc from shoulder to point. Its bulge scales from 0 (straight) to the arc tangent to the side (classic). */
+      var R0=(a*a+b*b)/(2*a), L=Math.hypot(a,b), hc=L/2, s0=R0-Math.sqrt(Math.max(0,R0*R0-hc*hc)), sg=c*s0;
+      if(sg<1e-6){ right=[[a,st],[0,d.h]]; }
+      else{
+        var R=(hc*hc+sg*sg)/(2*sg), nx=b/L, ny=a/L, ccx=a/2-nx*(R-sg), ccy=st+b/2-ny*(R-sg);
+        var a0=Math.atan2(st-ccy,a-ccx), da=Math.atan2(d.h-ccy,-ccx)-a0;
+        while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+        right=arc(ccx,ccy,R,a0,a0+da,N);
+      }
       var left=right.slice(0,-1).reverse().map(function(p){return [-p[0],p[1]];});
       return [[-a,0],[a,0]].concat(right,left);
     }},
-  kite:{solve:"h", dims:[W(18),H(32),{k:"t",label:"Top curve depth",unit:"%",min:5,max:50,step:1,def:28,hint:"How far down the rounded top reaches, as a share of the height. The widest point sits here."}],
+  kite:{solve:"h", dims:[W(18),H(32),{k:"t",label:"Top curve depth",unit:"%",min:5,max:50,step:1,def:28,hint:"How far down the rounded top reaches, as a share of the height. The widest point sits here."},CR()],
     outline:function(d){
       var a=d.w/2, t=d.h*d.t/100, o=[];
       for(var i=0;i<=N;i++){var f=Math.PI-Math.PI*i/N;o.push([a*Math.cos(f),t-t*Math.sin(f)]);}
       o.push([0,d.h]); return o;
     }},
-  teardrop:{solve:"h", minHW:1.05, dims:[W(20),H(28)],
+  teardrop:{solve:"h", minHW:1.05, dims:[W(20),H(28),CR()],
     note:"Round top with straight sides tangent to it. Height must be at least 5% more than width.",
     outline:function(d){
       var r=d.w/2, dd=d.h-r, be=Math.acos(Math.min(1,r/dd)), s=Math.PI-be, o=[], ang=[Math.PI/2,-Math.PI/2];
@@ -264,9 +276,13 @@ var SHAPES = {
   coffin:{solve:"h", dims:[W(20),H(25),
     {k:"sh",label:"Shoulder position",unit:"%",min:5,max:95,step:1,def:30,hint:"How far down the widest point sits, as a share of the height."},
     {k:"tw",label:"Top edge width",unit:"%",min:0,max:100,step:1,def:60,hint:"Width of the flat top, as a share of the full width."},
-    {k:"bw",label:"Bottom edge width",unit:"%",min:0,max:100,step:1,def:35,hint:"Width of the flat bottom, as a share of the full width. 0% makes a point."}],
+    {k:"bw",label:"Bottom edge width",unit:"%",min:0,max:100,step:1,def:35,hint:"Width of the flat bottom, as a share of the full width. 0% makes a point."},CR()],
     outline:function(d){var a=d.w/2,t=a*d.tw/100,b=a*d.bw/100,y=d.h*d.sh/100;
       return [[-t,0],[t,0],[a,y],[b,d.h],[-b,d.h],[-a,y]];}},
+  wankel:{solve:"d", dims:[{k:"d",label:"Width",min:6,max:48,step:0.25,def:25,solvable:true,hint:"A Reuleaux triangle, point down. With sharp corners it is exactly as tall as it is wide. Rounding the corners makes it slightly shorter."},CR()],
+    outline:function(d){var s=d.d, cy=s*Math.sqrt(3)/2, dy=s-cy, A=[-s/2,0], B=[s/2,0], C=[0,cy], o=[];
+      o=o.concat(arc(C[0],C[1],s,-2*Math.PI/3,-Math.PI/3,N), arc(A[0],A[1],s,0,Math.PI/3,N), arc(B[0],B[1],s,2*Math.PI/3,Math.PI,N));
+      return o.map(function(p){return [p[0],p[1]+dy];});}},
   rect:{solve:"h", dims:[W(16),H(27),{k:"r",label:"Corner radius",min:0,max:8,step:0.25,def:1}],
     outline:function(d){
       var a=d.w/2, h=d.h, r=Math.max(0,Math.min(d.r,a,h/2)), n=90;
@@ -275,7 +291,7 @@ var SHAPES = {
     }}
 };
 var MAXR = 11; /* longest side may be at most 11 times the shortest */
-var NAMES = {heater:"Heater",kite:"Kite",teardrop:"Teardrop",round:"Round",oval:"Oval",coffin:"Coffin",rect:"Rectangle"};
+var NAMES = {heater:"Heater",kite:"Kite",teardrop:"Teardrop",round:"Round",oval:"Oval",coffin:"Coffin",wankel:"Wankel",rect:"Rectangle"};
 
 /* geometry */
 function clean(pts){var o=[];pts.forEach(function(p){var q=o[o.length-1];if(!q||Math.hypot(p[0]-q[0],p[1]-q[1])>1e-7)o.push(p);});
@@ -297,9 +313,45 @@ function inset(pts,pad){
   poly=clean(poly); return poly.length>2&&area(poly)>=1?poly:null;
 }
 function bbox(p){var b={x0:1e9,y0:1e9,x1:-1e9,y1:-1e9};p.forEach(function(q){b.x0=Math.min(b.x0,q[0]);b.x1=Math.max(b.x1,q[0]);b.y0=Math.min(b.y0,q[1]);b.y1=Math.max(b.y1,q[1]);});return b;}
-function outer(sh,d){return clean(SHAPES[sh].outline(d));}
+function sharp(sh,d){return clean(SHAPES[sh].outline(d));}
+/* Outward offset of a convex outline by r (adds a round arc at each corner). */
+function dilate(pts,r){
+  var A=sArea(pts), sg=A>0?1:-1, n=pts.length, nr=[], out=[];
+  for(var i=0;i<n;i++){var a=pts[i],b=pts[(i+1)%n],dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);nr.push([sg*dy/L,-sg*dx/L]);}
+  for(var j=0;j<n;j++){var n1=nr[(j-1+n)%n],n2=nr[j],t1=Math.atan2(n1[1],n1[0]),dt=Math.atan2(n2[1],n2[0])-t1,p=pts[j];
+    while(dt>Math.PI)dt-=2*Math.PI; while(dt<-Math.PI)dt+=2*Math.PI;
+    if(Math.abs(dt)<Math.PI/48){var tm=t1+dt/2,rm=r/Math.cos(dt/2);out.push([p[0]+rm*Math.cos(tm),p[1]+rm*Math.sin(tm)]);continue;}
+    var k=Math.ceil(Math.abs(dt)/(Math.PI/48));
+    for(var m=0;m<=k;m++){var t=t1+dt*m/k;out.push([p[0]+r*Math.cos(t),p[1]+r*Math.sin(t)]);}}
+  return clean(out);
+}
+/* Rounded outline: shrink by r, grow back by r. Every corner gets radius r; curves already rounder than r are untouched.
+   The sharp shape is enlarged until the rounded result has exactly the width and height the user set. */
+function outer(sh,d){
+  var r=+d.cr||0, o, b;
+  if(!(r>0)) o=sharp(sh,d);
+  else{
+    var wh=hasWH(sh), W=wh?d.w:d.d, H=wh?d.h:d.d, q={}, k, kw=wh?"w":"d", pq=null, pw=0, ph=0;
+    for(k in d)q[k]=d[k];
+    for(var it=0;it<40;it++){
+      var c=inset(sharp(sh,q),r); if(!c) return null;
+      o=dilate(c,r); b=bbox(o); var bw=b.x1-b.x0, bh=b.y1-b.y0, ew=W-bw, eh=H-bh;
+      if(Math.abs(ew)<1e-7&&(!wh||Math.abs(eh)<1e-7)) break;
+      /* secant step on each dimension; a slope near 1 means rounding takes off a fixed amount */
+      var sw=1, sh2=1;
+      if(pq){ if(Math.abs(q[kw]-pq[kw])>1e-9) sw=(bw-pw)/(q[kw]-pq[kw]);
+              if(wh&&Math.abs(q.h-pq.h)>1e-9) sh2=(bh-ph)/(q.h-pq.h); }
+      if(!(sw>0.02&&sw<2)) sw=1; if(!(sh2>0.02&&sh2<2)) sh2=1;
+      pq={}; pq[kw]=q[kw]; pq.h=q.h; pw=bw; ph=bh;
+      q[kw]+=ew/sw; if(wh) q.h+=eh/sh2;
+      if(q[kw]>400||q.h>400) return null;
+    }
+  }
+  b=bbox(o); var mx=(b.x0+b.x1)/2;
+  return o.map(function(p){return [p[0]-mx,p[1]-b.y0];});
+}
 function geom(sh,d,pad){
-  var o=outer(sh,d), core=pad>0?inset(o,pad):null;
+  var o=outer(sh,d)||sharp(sh,d), core=pad>0?inset(o,pad):null;
   return {outer:o, A:area(o), core:core, coreA:core?area(core):0};
 }
 function hasWH(sh){return SHAPES[sh].dims.some(function(x){return x.k==="w";});}
@@ -307,12 +359,29 @@ function solveDim(sh,d,k,T){
   var lo=0.5, hi=120, rlo=false, rhi=false, hmin=SHAPES[sh].minHW||1/MAXR;
   if(hasWH(sh)&&k==="h"){if(d.w*hmin>lo)lo=d.w*hmin; if(d.w*MAXR<hi){hi=d.w*MAXR;rhi=true;}}
   if(hasWH(sh)&&k==="w"){if(d.h/MAXR>lo){lo=d.h/MAXR;rlo=true;} if(d.h/hmin<hi)hi=d.h/hmin;}
+  var oc=function(x){var c={};for(var q in d)c[q]=d[q];c[k]=x;return outer(sh,c);};
+  var f=function(x){var o=oc(x);return o?area(o):Infinity;};
+  /* a corner radius that doesn't fit a narrow shield makes small sizes impossible: start the search where it fits */
+  var fitR=false;
+  if(+d.cr>0&&!oc(lo)){
+    if(!oc(hi)) return {x:hi,ok:false,why:"big",ratio:false,fit:true};
+    var u=lo,v=hi; for(var j=0;j<40;j++){var m=(u+v)/2; if(oc(m))v=m; else u=m;}
+    lo=Math.ceil(v*16-1e-9)/16; if(lo>hi) lo=v; fitR=true; rlo=false;
+  }
   var lo0=lo;
-  var f=function(x){var c={};for(var q in d)c[q]=d[q];c[k]=x;return area(outer(sh,c));};
-  if(f(lo)>=T) return {x:lo,ok:false,why:"big",ratio:rlo};
-  if(f(hi)<=T) return {x:hi,ok:false,why:"small",ratio:rhi};
-  for(var i=0;i<50;i++){var m=(lo+hi)/2; if(f(m)>T) hi=m; else lo=m;}
-  var x=Math.floor(lo*16+1e-9)/16; return {x:Math.max(x,lo0),ok:true};
+  var fa=f(lo)-T, fb=f(hi)-T;
+  if(fa>=0) return {x:lo,ok:false,why:"big",ratio:rlo,fit:fitR};
+  if(fb<=0) return {x:hi,ok:false,why:"small",ratio:rhi};
+  var a=lo,b=hi,side=0;
+  for(var i=0;i<80&&b-a>1e-7;i++){
+    var x=(a*fb-b*fa)/(fb-fa); if(!(x>a&&x<b)) x=(a+b)/2;
+    var fx=f(x)-T;
+    if(fx>0){b=x;fb=fx;if(side===-1)fa/=2;side=-1;} else {a=x;fa=fx;if(side===1)fb/=2;side=1;}
+  }
+  var xs=Math.floor(a*16+1e-9)/16;
+  if(xs<lo0-1e-9){xs=Math.ceil(lo0*16-1e-9)/16; if(f(xs)>T) return {x:xs,ok:false,why:"big",ratio:rlo};}
+  while(xs-1/16>=lo0&&f(xs)>T) xs-=1/16;
+  return {x:xs,ok:true};
 }
 
 /* formatting */
@@ -352,7 +421,7 @@ function buildDims(){
       (dm.hint?'<div class="hint">'+dm.hint+'</div>':'');
     dimsEl.appendChild(el);
     var r=$("r-"+dm.k), n=$("n-"+dm.k), a=$("a-"+dm.k);
-    r.addEventListener("input",function(){state.dims[state.shape][dm.k]=+r.value;recompute(dm.k);});
+    r.addEventListener("input",function(){state.dims[state.shape][dm.k]=+r.value;schedule(dm.k);});
     n.addEventListener("input",function(){var v=parseFloat(n.value);if(!(v>=0))return;if(u!=="%"&&v<0.5)return;state.dims[state.shape][dm.k]=v;recompute(dm.k);});
     n.addEventListener("blur",function(){if(n.isConnected)update();});
     if(a)a.addEventListener("click",function(){state.solve[state.shape]=state.solve[state.shape]===dm.k?null:dm.k;recompute();});
@@ -360,6 +429,8 @@ function buildDims(){
   if(S.note){var h=document.createElement("div");h.className="hint";h.textContent=S.note;dimsEl.appendChild(h);}
 }
 
+var rafId=0;
+function schedule(k){ if(window.requestAnimationFrame){cancelAnimationFrame(rafId);rafId=requestAnimationFrame(function(){recompute(k);});} else recompute(k); }
 function recompute(edited){
   var sh=state.shape, d=state.dims[sh], sk=solveKey(); notes=[];
   SHAPES[sh].dims.forEach(function(dm){var v=+d[dm.k]; if(!isFinite(v))v=dm.def;
@@ -375,11 +446,17 @@ function recompute(edited){
       : "A heater has to be at least half as tall as it is wide to keep its point, so that value stopped at the limit.");
   }
   if(sh==="rect"){var mx=Math.min(d.w,d.h)/2; if(d.r>mx){d.r=Math.floor(mx*4)/4;}}
+  if(+d.cr>0&&!outer(sh,d)){
+    while(d.cr>0&&!outer(sh,d)) d.cr=Math.max(0,Math.round((d.cr-0.125)*8)/8);
+    notes.push("The corner radius was too big for a shield this size, so it was reduced to fit.");
+  }
   var T=targetArea();
   if(T&&sk){
     var res=solveDim(sh,d,sk,T), lab=SHAPES[sh].dims.filter(function(x){return x.k===sk;})[0].label.toLowerCase();
     d[sk]=res.x;
-    if(!res.ok) notes.push(res.ratio
+    if(!res.ok) notes.push(res.fit
+      ? "At this corner radius the shield can't be narrow enough to reach the target. Use a smaller corner radius or change another dimension."
+      : res.ratio
       ? "The target can't be reached without going past the 11:1 shape limit. Change the other dimension."
       : res.why==="big"
       ? "The shield is over the target even at the smallest "+lab+". Shrink one of the other dimensions."
@@ -458,7 +535,7 @@ function draw(g,d,sh){
     shield='<path d="'+path(g.outer)+'" fill="rgba(255,255,255,.16)" stroke="#ffffff" stroke-width="2.5" '+ns+'/>';
   }
   var dy=-2, dx=Wd+2, t=0.45, dim='';
-  var lbl=sh==="round"?"Ø "+frac(Wd,solveKey()==="d").replace("≈ ",""):frac(Wd,solveKey()==="w");
+  var lbl=sh==="round"?"Ø "+frac(Wd,solveKey()==="d").replace("≈ ",""):frac(Wd,solveKey()==="w"||(sh==="wankel"&&solveKey()==="d"));
   dim+='<path d="M0 '+dy+'H'+Wd.toFixed(3)+'M0 '+(dy-t)+'V'+(dy+t)+'M'+Wd.toFixed(3)+' '+(dy-t)+'V'+(dy+t)+'" stroke="var(--tape)" stroke-width="1.5" fill="none" '+ns+'/>';
   dim+='<text class="dl" x="'+(Wd/2).toFixed(3)+'" y="'+(dy-0.7).toFixed(3)+'" text-anchor="middle">'+lbl+'</text>';
   if(sh!=="round"){
@@ -511,7 +588,7 @@ function buildPrint(){
   var cx=T.ox+T.Wd/2, totW=T.cols*T.sx+OV, totH=T.rows*T.sy+OV;
   var rows=[["Shape",NAMES[sh]],["Finished size",frac(T.Wd,false)+" wide × "+frac(T.Hd,false)+" tall"],
     ["Face area",a1(g.A)+" in² ("+(g.A/144).toFixed(2)+" ft²), "+c.name]];
-  SHAPES[sh].dims.forEach(function(dm){if(dm.unit==="%")rows.push([dm.label,fmt(d[dm.k],0)+"% of height"]);if(dm.k==="r")rows.push([dm.label,frac(d.r,false)]);});
+  SHAPES[sh].dims.forEach(function(dm){if(dm.unit==="%")rows.push([dm.label,fmt(d[dm.k],0)+"%"+({s:" of height",t:" of height",sh:" of height",tw:" of width",bw:" of width"}[dm.k]||"")]);if(dm.k==="r"||dm.k==="cr")rows.push([dm.label,frac(d[dm.k],false)]);});
   rows.push(["Edge padding",state.pad>0?frac(state.pad,false):"None"]);
   if(g.core){var cb=bbox(g.core);rows.push(["Core before padding",frac(cb.x1-cb.x0,true).replace("≈ ","")+" × "+frac(cb.y1-cb.y0,true).replace("≈ ","")+", "+a1(g.coreA)+" in²"]);}
   rows.push(["Lines printed",useCore?"Solid: core cut line. Dashed: finished edge.":"Solid: finished outline."]);
